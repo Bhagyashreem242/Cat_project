@@ -1,0 +1,166 @@
+body {
+    font-family: Arial, sans-serif;
+    background-image: url('/static/images/cat_image.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.container {
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(8px);
+    padding: 35px;
+    border-radius: 20px;
+    width: 460px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.25);
+}
+
+h1 { margin-bottom: 20px; color: #222; font-size: 28px; }
+h2 { color: #333; font-size: 20px; margin-bottom: 12px; }
+
+/* ── Tabs ─────────────────────────────────────────────────── */
+.tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.tab {
+    flex: 1;
+    padding: 10px;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 15px;
+    transition: 0.2s;
+}
+
+.tab.active, .tab:hover {
+    background: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+
+/* ── Forms ────────────────────────────────────────────────── */
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+input[type="file"] {
+    padding: 10px;
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+}
+
+.btn-green {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 13px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 17px;
+    transition: 0.3s;
+}
+.btn-green:hover { background: #3f9442; transform: scale(1.02); }
+.btn-green:disabled { background: #aaa; transform: none; cursor: default; }
+
+.btn-red {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 13px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 17px;
+    transition: 0.3s;
+}
+.btn-red:hover  { background: #c0392b; transform: scale(1.02); }
+.btn-red:disabled { background: #aaa; transform: none; cursor: default; }
+
+/* ── Live record section ──────────────────────────────────── */
+.record-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 0;
+}
+
+.mic-idle      { font-size: 22px; color: #555; font-weight: bold; }
+.mic-recording { font-size: 22px; color: #e74c3c; font-weight: bold; }
+
+.timer { font-size: 18px; color: #333; }
+
+.btn-row { display: flex; gap: 12px; justify-content: center; }
+.btn-row button { width: 170px; }
+
+.hint { color: #777; font-size: 13px; margin: 0; }
+
+/* ── Result card ──────────────────────────────────────────── */
+.result {
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(255,255,255,0.8);
+    border-radius: 15px;
+    border: 1px solid #eee;
+}
+
+.emotion {
+    font-size: 38px;
+    font-weight: bold;
+    color: #222;
+    margin: 8px 0;
+}
+
+.confidence { font-size: 20px; color: #444; margin-top: 6px; }
+
+audio { width: 100%; margin-top: 16px; }
+
+/* ── Score bars ───────────────────────────────────────────── */
+.score-bars { margin-top: 16px; text-align: left; }
+
+.score-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+
+.score-label { width: 100px; font-size: 13px; white-space: nowrap; }
+.score-val   { width: 48px; font-size: 13px; text-align: right; }
+
+.bar-wrap {
+    flex: 1;
+    background: #eee;
+    border-radius: 6px;
+    height: 12px;
+    overflow: hidden;
+}
+
+.bar {
+    height: 100%;
+    background: #4CAF50;
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+/* ── Emotion colours ──────────────────────────────────────── */
+.happy    { color: #2ecc71; }
+.sad      { color: #3498db; }
+.angry    { color: #e74c3c; }
+.fighting { color: #f39c12; }
+
+.err { color: #e74c3c; font-weight: bold; }
