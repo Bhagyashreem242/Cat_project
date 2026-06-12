@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cat Emotion Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .spectrogram-box { margin-top: 18px; text-align: center; }
+        .spectrogram-box p { font-size: 0.85rem; color: #888; margin-bottom: 6px; }
+        .spectrogram-box img {
+            width: 100%; max-width: 500px;
+            border-radius: 10px;
+            border: 1.5px solid #e0e0e0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>🐱 Cat Emotion Detection</h1>
+
+    <!-- ── TABS ─────────────────────────────────────────────────── -->
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('upload', event)">📁 Upload File</button>
+        <button class="tab"        onclick="showTab('live',   event)">🎙️ Live Record</button>
+    </div>
+
+    <!-- ── UPLOAD TAB ────────────────────────────────────────────── -->
+    <div id="tab-upload" class="tab-content">
+        <form method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".wav,.mp3" required>
+            <button type="submit" class="btn-green">Predict Emotion</button>
+        </form>
+
+        {% if error %}
+        <div class="result">
+            <p class="err">⚠️ {{ error }}</p>
+        </div>
+        {% endif %}
+
+        {% if prediction %}
+        <div class="result">
+            <h2>Prediction Result</h2>
+            <div class="emotion {{ prediction | lower | replace('😾 ','') | replace('⚔️ ','') | replace('😸 ','') | replace('😿 ','') }}">
+                {{ prediction }}
+            </div>
+            <div class="confidence">Confidence: {{ confidence }}%</div>
+
+            {% if spectrogram %}
+            <div class="spectrogram-box">
+                <p>📊 Mel-Spectrogram (saved to spectrogram_dataset/{{ prediction.split(' ')[-1] | lower }}/)</p>
+                <img src="/{{ spectrogram }}" alt="Spectrogram">
+            </div>
+            {% endif %}
+
+            {% if all_scores %}
+            <div class="score-bars">
+                {% for label, score in all_scores.items() %}
+                <div class="score-row">
+                    <span class="score-label">{{ label }}</span>
+                    <div class="bar-wrap">
+                        <div class="bar" style="width:{{ score }}%"></div>
+                    </div>
+                    <span class="score-val">{{ score }}%</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if audio_file %}
+            <audio controls>
+                <source src="{{ url_for('static', filename='uploads/' + audio_file) }}" type="audio/wav">
+            </audio>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── LIVE TAB ──────────────────────────────────────────────── -->
+    <div id="tab-live" class="tab-content" style="display:none">
+
+        <div class="record-section">
+            <div id="mic-status" class="mic-idle">🎙️ Ready to Record</div>
+            <div id="timer" class="timer" style="display:none">⏱️ <span id="sec">0</span>s</div>
+
+            <div class="btn-row">
+                <button id="btn-start" class="btn-red"   onclick="startRecording()">▶ Start Recording</button>
+                <button id="btn-stop"  class="btn-green" onclick="stopRecording()" disabled>⏹ Stop & Predict</button>
+            </div>
+
+            <p class="hint">Hold the microphone near your cat and record 2–5 seconds of sound.</p>
+        </div>
+
+        <div id="live-result" style="display:none" class="result">
+            <h2>Live Prediction</h2>
+            <div id="live-emotion" class="emotion"></div>
+            <div id="live-confidence" class="confidence"></div>
+
+            <!-- Spectrogram image -->
+            <div id="live-spectrogram-box" class="spectrogram-box" style="display:none">
+                <p id="live-spec-label">📊 Mel-Spectrogram</p>
+                <img id="live-spec-img" src="" alt="Spectrogram">
+            </div>
+
+            <div id="live-bars" class="score-bars"></div>
+            <audio id="live-audio" controls style="width:100%;margin-top:16px;display:none"></audio>
+        </div>
+
+        <div id="live-error" class="result" style="display:none">
+            <p class="err" id="live-err-msg"></p>
+        </div>
+    </div>
+
+</div><!-- /container -->
+
+<script>
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function showTab(name, e) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + name).style.display = 'block';
+    if (e && e.target) e.target.classList.add('active');
+}
+
+// ── Upload form spinner ───────────────────────────────────────────────────────
+const form = document.querySelector("form");
+if (form) {
+    form.addEventListener("submit", () => {
+        const btn = form.querySelector("button[type=submit]");
+        btn.innerHTML = "⏳ Predicting...";
+        btn.disabled = true;
+    });
+}
+
+// ── Live recording ────────────────────────────────────────────────────────────
+let mediaRecorder = null;
+let chunks = [];
+let timerInterval = null;
+let seconds = 0;
+
+async function startRecording() {
+    chunks = [];
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', '']
+            .find(m => m === '' || MediaRecorder.isTypeSupported(m)) || '';
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        mediaRecorder.onstop = sendToServer;
+
+        mediaRecorder.start(100);
+        seconds = 0;
+        document.getElementById('sec').textContent = '0';
+        document.getElementById('timer').style.display = 'block';
+        timerInterval = setInterval(() => {
+            seconds++;
+            document.getElementById('sec').textContent = seconds;
+        }, 1000);
+
+        document.getElementById('mic-status').textContent = '🔴 Recording...';
+        document.getElementById('mic-status').className = 'mic-recording';
+        document.getElementById('btn-start').disabled = true;
+        document.getElementById('btn-stop').disabled = false;
+        document.getElementById('live-result').style.display = 'none';
+        document.getElementById('live-error').style.display = 'none';
+
+    } catch (err) {
+        showLiveError('Microphone access denied: ' + err.message);
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(t => t.stop());
+    }
+    clearInterval(timerInterval);
+    document.getElementById('timer').style.display = 'none';
+    document.getElementById('mic-status').textContent = '⏳ Analysing...';
+    document.getElementById('mic-status').className = 'mic-idle';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled = true;
+}
+
+async function sendToServer() {
+    const mimeType = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
+    const ext  = mimeType.includes('ogg') ? 'ogg' : 'webm';
+    const blob = new Blob(chunks, { type: mimeType });
+
+    const audioEl = document.getElementById('live-audio');
+    audioEl.src = URL.createObjectURL(blob);
+    audioEl.style.display = 'block';
+
+    const formData = new FormData();
+    formData.append('audio', blob, `live_recording.${ext}`);
+
+    try {
+        const resp = await fetch('/predict_live', { method: 'POST', body: formData });
+        let data;
+        try { data = await resp.json(); }
+        catch (_) { showLiveError('Server returned unexpected response. Check terminal for errors.'); return; }
+
+        if (!resp.ok || data.error) { showLiveError(data.error || 'Unknown server error'); return; }
+        if (!data.prediction)       { showLiveError('No prediction returned from server.'); return; }
+
+        const emotionKey = data.prediction.replace(/😾|⚔️|😸|😿/g, '').trim().toLowerCase();
+
+        document.getElementById('live-emotion').textContent  = data.prediction;
+        document.getElementById('live-emotion').className    = 'emotion ' + emotionKey;
+        document.getElementById('live-confidence').textContent = 'Confidence: ' + data.confidence + '%';
+
+        // Show spectrogram
+        if (data.spectrogram) {
+            document.getElementById('live-spec-img').src   = '/' + data.spectrogram + '?t=' + Date.now();
+            document.getElementById('live-spec-label').textContent = '📊 Mel-Spectrogram (saved to spectrograms/' + emotionKey + '/)';
+            document.getElementById('live-spectrogram-box').style.display = 'block';
+        }
+
+        // Score bars
+        const barsEl = document.getElementById('live-bars');
+        barsEl.innerHTML = '';
+        for (const [label, score] of Object.entries(data.all_scores)) {
+            barsEl.innerHTML += `
+                <div class="score-row">
+                    <span class="score-label">${label}</span>
+                    <div class="bar-wrap"><div class="bar" style="width:${score}%"></div></div>
+                    <span class="score-val">${score}%</span>
+                </div>`;
+        }
+
+        document.getElementById('live-result').style.display = 'block';
+        document.getElementById('mic-status').textContent = '🎙️ Ready to Record';
+
+    } catch (err) {
+        showLiveError('Server error: ' + err.message);
+    }
+}
+
+function showLiveError(msg) {
+    document.getElementById('live-err-msg').textContent = '⚠️ ' + msg;
+    document.getElementById('live-error').style.display = 'block';
+    document.getElementById('mic-status').textContent = '🎙️ Ready to Record';
+}
+</script>
+</body>
+</html>
