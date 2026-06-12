@@ -1,0 +1,4 @@
+angry
+fighting
+happy
+sad
