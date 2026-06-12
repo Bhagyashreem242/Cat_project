@@ -1,0 +1,10 @@
+tensorflow
+flask
+numpy
+opencv-python
+matplotlib
+librosa
+soundfile
+scikit-learn
+pillow
+audioread
